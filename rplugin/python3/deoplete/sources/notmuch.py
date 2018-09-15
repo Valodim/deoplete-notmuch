@@ -8,24 +8,26 @@ class Source(Base):
     COLON_PATTERN = re.compile(r':\s?')
     COMMA_PATTERN = re.compile(r'.+,\s?')
     HEADER_PATTERN = re.compile(r'^(Bcc|Cc|From|Reply-To|To):(\s?|.+,\s?)')
-    SEXP_PATTERN = re.compile(r'\(:name "(?P<name>.*)" :address "(?P<address>.+)" :name-addr "(?P<name_addr>.+)"\)')
 
     def __init__(self, vim):
         super().__init__(vim)
 
         self.rank = 75  # default is 100, give deoplete-abook priority
         self.name = 'notmuch'
-        self.mark = '[nm]'
+        self.mark = ''
         self.min_pattern_length = 0
         self.filetypes = ['mail']
-        self.matchers = ['matcher_full_fuzzy', 'matcher_length']
+        self.matchers = ['matcher_length', 'matcher_full_fuzzy']
+        self.is_volatile = False
+        self.max_candidates = 10000
+        self.addresscache = None
 
     def on_init(self, context):
         self.command = context['vars'].get('deoplete#sources#notmuch#command',
                                            ['notmuch', 'address',
-                                            '--format=sexp',
-                                            '--output=recipients',
-                                            'tag:sent'])
+                                            '--format=text',
+                                            '--deduplicate=address',
+                                            '*' ])
 
     def get_complete_position(self, context):
         colon = self.COLON_PATTERN.search(context['input'])
@@ -33,19 +35,16 @@ class Source(Base):
         return max(colon.end() if colon is not None else -1,
                    comma.end() if comma is not None else -1)
 
-    # TODO: caching?
     def gather_candidates(self, context):
         if self.HEADER_PATTERN.search(context['input']) is None:
             return
 
-        try:
-            command_results = subprocess.check_output(self.command, universal_newlines=True).split('\n')
-        except CalledProcessError:
-            return
+        if self.addresscache is None:
+            try:
+                command_results = subprocess.check_output(self.command, universal_newlines=True).split('\n')
+            except CalledProcessError:
+                return
 
-        results = []
-        for row in command_results:
-            regexp = self.SEXP_PATTERN.search(row.strip())
-            if regexp:
-                results.append({'word': regexp.group("name_addr")})
-        return results
+            self.addresscache = list(command_results)
+
+        return self.addresscache
