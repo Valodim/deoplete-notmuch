@@ -16,7 +16,7 @@ class Source(Base):
         self.name = 'notmuch'
         self.mark = ''
         self.min_pattern_length = 0
-        self.filetypes = ['mail']
+        self.filetypes = ['mail', 'notmuch-compose']
         self.matchers = ['matcher_length', 'matcher_full_fuzzy']
         self.is_volatile = False
         self.max_candidates = 10000
